@@ -80,3 +80,42 @@ variable "log_retention_days" {
   description = "CloudWatch log retention"
   default     = 7
 }
+
+variable "repo_owner" {
+  type        = string
+  description = "Source repository owner (e.g. GitHub org/user)"
+}
+
+variable "repo_name" {
+  type        = string
+  description = "Source repository name"
+}
+
+variable "repo_branch" {
+  type        = string
+  description = "Source repository branch"
+  default     = "main"
+}
+
+variable "codestar_connection_arn" {
+  type        = string
+  description = "Existing CodeStar Connection ARN for the repo"
+}
+
+variable "pipeline_name" {
+  type        = string
+  description = "CodePipeline name"
+  default     = "firstinfra-pipeline"
+}
+
+variable "build_project_name" {
+  type        = string
+  description = "CodeBuild project name"
+  default     = "firstinfra-build"
+}
+
+variable "container_name" {
+  type        = string
+  description = "Container name in task definition to update"
+  default     = "app"
+}

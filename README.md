@@ -42,4 +42,15 @@ public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
 private_subnet_cidrs = ["10.0.101.0/24", "10.0.102.0/24"]
 ecr_repository_name  = "hello-world"
 image_tag            = "latest"
+repo_owner           = "your-org"
+repo_name            = "your-repo"
+repo_branch          = "main"
+codestar_connection_arn = "arn:aws:codestar-connections:us-east-1:123456789012:connection/abc123"
+pipeline_name        = "firstinfra-pipeline"
+build_project_name   = "firstinfra-build"
+container_name       = "app"
 ```
+
+## CI/CD notes
+- The pipeline uses a CodeStar connection; authorize it in the AWS console before running.
+- The build runs `buildspec.yaml` to build, push, register a new task definition, and update the ECS service.

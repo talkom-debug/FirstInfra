@@ -1,0 +1,67 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_TAG: ""
+    IMAGE_URI: ""
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REPO"
+      - SHORT_COMMIT=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c 1-7)
+      - IMAGE_TAG="$SHORT_COMMIT"
+      - IMAGE_URI="$ECR_REPO:$IMAGE_TAG"
+      - echo "Using image tag $IMAGE_TAG"
+  build:
+    commands:
+      - echo "Build started on $(date)"
+      - docker build -t "$IMAGE_URI" ./docker
+      - docker push "$IMAGE_URI"
+  post_build:
+    commands:
+      - echo "Registering new task definition..."
+      - aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --query taskDefinition --output json > taskdef.json
+      - |
+        python - <<'PY'
+        import json
+        import os
+
+        with open("taskdef.json", "r", encoding="utf-8") as f:
+          taskdef = json.load(f)
+
+        container_name = os.environ["CONTAINER_NAME"]
+        image_uri = os.environ["IMAGE_URI"]
+
+        found = False
+        for container in taskdef.get("containerDefinitions", []):
+          if container.get("name") == container_name:
+            container["image"] = image_uri
+            found = True
+            break
+
+        if not found:
+          raise SystemExit(f"Container {container_name} not found in task definition")
+
+        for key in [
+          "taskDefinitionArn",
+          "revision",
+          "status",
+          "requiresAttributes",
+          "compatibilities",
+          "registeredAt",
+          "registeredBy",
+        ]:
+          taskdef.pop(key, None)
+
+        with open("taskdef-new.json", "w", encoding="utf-8") as f:
+          json.dump(taskdef, f)
+        PY
+      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef-new.json --query taskDefinition.taskDefinitionArn --output text)
+      - echo "Updating ECS service to $TASK_DEF_ARN"
+      - aws ecs update-service --cluster "$CLUSTER_NAME" --service "$SERVICE_NAME" --task-definition "$TASK_DEF_ARN"
+
+artifacts:
+  files:
+    - '**/*'

@@ -339,3 +339,246 @@ resource "aws_vpc_endpoint" "s3" {
     Name = "${var.name_prefix}-s3"
   }
 }
+
+resource "aws_s3_bucket" "pipeline_artifacts" {
+  bucket_prefix = "${var.name_prefix}-pipeline-"
+}
+
+resource "aws_s3_bucket_versioning" "pipeline_artifacts" {
+  bucket = aws_s3_bucket.pipeline_artifacts.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "pipeline_artifacts" {
+  bucket                  = aws_s3_bucket.pipeline_artifacts.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+data "aws_iam_policy_document" "codebuild_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["codebuild.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "codebuild" {
+  name               = "${var.name_prefix}-codebuild"
+  assume_role_policy = data.aws_iam_policy_document.codebuild_assume.json
+}
+
+data "aws_iam_policy_document" "codebuild_policy" {
+  statement {
+    actions = [
+      "ecr:GetAuthorizationToken",
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+      "ecr:CompleteLayerUpload",
+      "ecr:InitiateLayerUpload",
+      "ecr:PutImage",
+      "ecr:UploadLayerPart",
+      "ecr:DescribeRepositories",
+      "ecr:DescribeImages"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "ecs:DescribeTaskDefinition",
+      "ecs:RegisterTaskDefinition",
+      "ecs:UpdateService"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions   = ["iam:PassRole"]
+    resources = [aws_iam_role.ecs_task_execution.arn]
+  }
+
+  statement {
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:PutObject",
+      "s3:GetBucketLocation",
+      "s3:ListBucket"
+    ]
+    resources = [
+      aws_s3_bucket.pipeline_artifacts.arn,
+      "${aws_s3_bucket.pipeline_artifacts.arn}/*"
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "codebuild" {
+  role   = aws_iam_role.codebuild.id
+  policy = data.aws_iam_policy_document.codebuild_policy.json
+}
+
+resource "aws_codebuild_project" "app" {
+  name         = var.build_project_name
+  service_role = aws_iam_role.codebuild.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+
+    environment_variable {
+      name  = "ECR_REPO"
+      value = data.aws_ecr_repository.app.repository_url
+    }
+
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.region
+    }
+
+    environment_variable {
+      name  = "CLUSTER_NAME"
+      value = aws_ecs_cluster.main.name
+    }
+
+    environment_variable {
+      name  = "SERVICE_NAME"
+      value = aws_ecs_service.app.name
+    }
+
+    environment_variable {
+      name  = "TASK_FAMILY"
+      value = aws_ecs_task_definition.app.family
+    }
+
+    environment_variable {
+      name  = "CONTAINER_NAME"
+      value = var.container_name
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "buildspec.yaml"
+  }
+}
+
+data "aws_iam_policy_document" "codepipeline_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["codepipeline.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "codepipeline" {
+  name               = "${var.name_prefix}-codepipeline"
+  assume_role_policy = data.aws_iam_policy_document.codepipeline_assume.json
+}
+
+data "aws_iam_policy_document" "codepipeline_policy" {
+  statement {
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:PutObject",
+      "s3:GetBucketLocation",
+      "s3:ListBucket"
+    ]
+    resources = [
+      aws_s3_bucket.pipeline_artifacts.arn,
+      "${aws_s3_bucket.pipeline_artifacts.arn}/*"
+    ]
+  }
+
+  statement {
+    actions = [
+      "codebuild:StartBuild",
+      "codebuild:BatchGetBuilds"
+    ]
+    resources = [aws_codebuild_project.app.arn]
+  }
+
+  statement {
+    actions   = ["codestar-connections:UseConnection"]
+    resources = [var.codestar_connection_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "codepipeline" {
+  role   = aws_iam_role.codepipeline.id
+  policy = data.aws_iam_policy_document.codepipeline_policy.json
+}
+
+resource "aws_codepipeline" "app" {
+  name     = var.pipeline_name
+  role_arn = aws_iam_role.codepipeline.arn
+
+  artifact_store {
+    location = aws_s3_bucket.pipeline_artifacts.bucket
+    type     = "S3"
+  }
+
+  stage {
+    name = "Source"
+
+    action {
+      name             = "Source"
+      category         = "Source"
+      owner            = "AWS"
+      provider         = "CodeStarSourceConnection"
+      version          = "1"
+      output_artifacts = ["SourceOutput"]
+
+      configuration = {
+        ConnectionArn    = var.codestar_connection_arn
+        FullRepositoryId = "${var.repo_owner}/${var.repo_name}"
+        BranchName       = var.repo_branch
+        DetectChanges    = "true"
+      }
+    }
+  }
+
+  stage {
+    name = "Build"
+
+    action {
+      name             = "Build"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["BuildOutput"]
+
+      configuration = {
+        ProjectName = aws_codebuild_project.app.name
+      }
+    }
+  }
+}
