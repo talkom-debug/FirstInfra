@@ -3,6 +3,36 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "prefix" {
+  type        = string
+  description = "Prefix for resource names"
+  default     = null
+}
+
+variable "environment" {
+  type        = string
+  description = "Deployment environment name (e.g. dev, staging, prod)"
+  default     = null
+}
+
+variable "owner" {
+  type        = string
+  description = "Owner tag value"
+  default     = null
+}
+
+variable "alb_ingress_cidrs" {
+  type        = list(string)
+  description = "CIDR blocks allowed to reach the ALB"
+  default     = ["0.0.0.0/0"]
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Additional tags to apply to resources"
+  default     = {}
+}
+
 variable "azs" {
   type        = list(string)
   description = "Availability zones"
