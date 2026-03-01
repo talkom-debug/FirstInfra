@@ -10,7 +10,7 @@ module "ecs_log_group" {
 
 module "ecs" {
   source  = "terraform-aws-modules/ecs/aws"
-  version = "~> 5.0"
+  version = "~> 6.0"
 
   cluster_name = local.ecs_cluster_name
 

@@ -9,7 +9,7 @@ module "alb" {
   subnets = module.vpc.public_subnets
 
   create_security_group = false
-  security_group_ids    = [module.sg_alb.security_group_id]
+  security_groups       = [module.sg_alb.security_group_id]
 
   listeners = {
     http = {

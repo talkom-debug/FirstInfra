@@ -110,7 +110,7 @@ module "codebuild_project" {
   source = "../tf-modules/codebuild-project"
 
   name             = local.codebuild_project_name
-  service_role_arn = module.codebuild_role.iam_role_arn
+  service_role_arn = module.codebuild_role.arn
   buildspec        = "buildspec.yaml"
 
   environment = {
@@ -216,7 +216,7 @@ module "codepipeline" {
   source = "../tf-modules/codepipeline"
 
   name     = local.codepipeline_name
-  role_arn = module.codepipeline_role.iam_role_arn
+  role_arn = module.codepipeline_role.arn
 
   artifact_store = {
     location = module.pipeline_bucket.s3_bucket_id
