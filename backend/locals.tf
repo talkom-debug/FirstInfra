@@ -1,13 +1,12 @@
 locals {
-  general = {
-    env_name = var.env_name
-    prefix   = var.prefix
-  }
+  resources_prefix_name = "${var.env_name}-${var.prefix}"
 
-  global_tags = {
-    "project"    = "datalake"
-    "created_by" = "terraform"
-  }
-
-  resources_prefix_name = "${local.general.env_name}-${local.general.prefix}"
+  common_tags = merge(
+    {
+      Project     = var.prefix
+      Environment = var.env_name
+      Owner       = var.owner
+    },
+    var.tags
+  )
 }

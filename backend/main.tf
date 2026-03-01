@@ -2,15 +2,16 @@
 #--------------AWS KMS---------------#
 ######################################
 
-resource "aws_kms_key" "terraform-bucket-key" {
-  description             = "This key is used to encrypt bucket objects"
-  deletion_window_in_days = 10
-  enable_key_rotation     = true
-}
+module "kms_terraform_state" {
+  source  = "terraform-aws-modules/kms/aws"
+  version = "~> 3.0"
 
-resource "aws_kms_alias" "key-alias" {
-  name          = "alias/terraform-bucket-key"
-  target_key_id = aws_kms_key.terraform-bucket-key.key_id
+  description         = "KMS key for Terraform state bucket encryption"
+  enable_key_rotation = true
+
+  aliases = ["alias/terraform-bucket-key"]
+
+  tags = local.common_tags
 }
 
 ######################################
@@ -19,7 +20,7 @@ resource "aws_kms_alias" "key-alias" {
 
 module "s3_terraform" {
   source  = "terraform-aws-modules/s3-bucket/aws"
-  version = "4.1.1"
+  version = "~> 4.0"
 
   bucket = "${local.resources_prefix_name}-terraform-state"
 
@@ -32,13 +33,22 @@ module "s3_terraform" {
     enabled = true
   }
 
+  server_side_encryption_configuration = {
+    rule = {
+      apply_server_side_encryption_by_default = {
+        kms_master_key_id = module.kms_terraform_state.key_arn
+        sse_algorithm     = "aws:kms"
+      }
+    }
+  }
+
   attach_public_policy = false
   attach_policy        = true
   policy               = data.aws_iam_policy_document.s3_bucket_policy.json
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "S3 Remote Terraform State Store"
-  }
+  })
 }
 
 data "aws_iam_policy_document" "s3_bucket_policy" {
@@ -84,24 +94,5 @@ data "aws_iam_policy_document" "s3_bucket_policy" {
       variable = "aws:SecureTransport"
       values   = ["false"]
     }
-  }
-}
-
-######################################
-#------------AWS DynamoDB------------#
-######################################
-
-resource "aws_dynamodb_table" "terraform_statelock" {
-  name           = "${local.resources_prefix_name}-terraform-locks"
-  read_capacity  = 20
-  write_capacity = 20
-  hash_key       = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-  tags = {
-    Name = "DynamoDB Terraform State Lock Table"
   }
 }
