@@ -27,6 +27,10 @@ module "alb" {
       protocol    = "HTTP"
       port        = var.container_port
       target_type = "ip"
+
+      # Targets are registered by the ECS service.
+      create_attachment = false
+
       health_check = {
         path                = "/"
         protocol            = "HTTP"
