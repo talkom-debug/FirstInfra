@@ -1,7 +1,7 @@
-prefix               = "firstinfra"
+prefix               = "baseinfra"
 environment          = "dev"
 owner                = "platform"
-aws_profile          = "tal-komemi-tf"
+aws_profile          = "training"
 region               = "eu-west-1"
 azs                  = ["eu-west-1a", "eu-west-1b"]
 vpc_cidr             = "10.0.0.0/16"
