@@ -1,4 +1,6 @@
 module "pipeline_bucket" {
+  count = var.create_cicd_resources ? 1 : 0
+
   source  = "terraform-aws-modules/s3-bucket/aws"
   version = "~> 4.0"
 
@@ -17,6 +19,8 @@ module "pipeline_bucket" {
 }
 
 data "aws_iam_policy_document" "codebuild" {
+  count = var.create_cicd_resources ? 1 : 0
+
   statement {
     actions = [
       "ecr:GetAuthorizationToken",
@@ -45,7 +49,7 @@ data "aws_iam_policy_document" "codebuild" {
 
   statement {
     actions   = ["iam:PassRole"]
-    resources = [module.ecs.services[local.ecs_service_name].task_exec_iam_role_arn]
+    resources = [module.ecs[0].services[local.ecs_service_name].task_exec_iam_role_arn]
   }
 
   statement {
@@ -66,24 +70,28 @@ data "aws_iam_policy_document" "codebuild" {
       "s3:ListBucket"
     ]
     resources = [
-      module.pipeline_bucket.s3_bucket_arn,
-      "${module.pipeline_bucket.s3_bucket_arn}/*"
+      module.pipeline_bucket[0].s3_bucket_arn,
+      "${module.pipeline_bucket[0].s3_bucket_arn}/*"
     ]
   }
 }
 
 module "codebuild_policy" {
+  count = var.create_cicd_resources ? 1 : 0
+
   source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
   version = "~> 6.0"
 
   name        = "${var.prefix}-${var.environment}-codebuild"
   description = "CodeBuild policy for ECS deployments"
-  policy      = data.aws_iam_policy_document.codebuild.json
+  policy      = data.aws_iam_policy_document.codebuild[0].json
 
   tags = local.common_tags
 }
 
 module "codebuild_role" {
+  count = var.create_cicd_resources ? 1 : 0
+
   source  = "terraform-aws-modules/iam/aws//modules/iam-role"
   version = "~> 6.0"
 
@@ -100,17 +108,19 @@ module "codebuild_role" {
   }
 
   policies = {
-    CodeBuild = module.codebuild_policy.arn
+    CodeBuild = module.codebuild_policy[0].arn
   }
 
   tags = local.common_tags
 }
 
 module "codebuild_project" {
+  count = var.create_cicd_resources ? 1 : 0
+
   source = "../tf-modules/codebuild-project"
 
   name             = local.codebuild_project_name
-  service_role_arn = module.codebuild_role.arn
+  service_role_arn = module.codebuild_role[0].arn
   buildspec        = "buildspec.yaml"
 
   environment = {
@@ -137,7 +147,7 @@ module "codebuild_project" {
       },
       {
         name  = "TASK_FAMILY"
-        value = module.ecs.services[local.ecs_service_name].task_definition_family
+        value = module.ecs[0].services[local.ecs_service_name].task_definition_family
       },
       {
         name  = "CONTAINER_NAME"
@@ -150,6 +160,8 @@ module "codebuild_project" {
 }
 
 data "aws_iam_policy_document" "codepipeline" {
+  count = var.create_cicd_resources ? 1 : 0
+
   statement {
     actions = [
       "s3:GetObject",
@@ -159,8 +171,8 @@ data "aws_iam_policy_document" "codepipeline" {
       "s3:ListBucket"
     ]
     resources = [
-      module.pipeline_bucket.s3_bucket_arn,
-      "${module.pipeline_bucket.s3_bucket_arn}/*"
+      module.pipeline_bucket[0].s3_bucket_arn,
+      "${module.pipeline_bucket[0].s3_bucket_arn}/*"
     ]
   }
 
@@ -169,7 +181,7 @@ data "aws_iam_policy_document" "codepipeline" {
       "codebuild:StartBuild",
       "codebuild:BatchGetBuilds"
     ]
-    resources = [module.codebuild_project.project_arn]
+    resources = [module.codebuild_project[0].project_arn]
   }
 
   statement {
@@ -179,17 +191,21 @@ data "aws_iam_policy_document" "codepipeline" {
 }
 
 module "codepipeline_policy" {
+  count = var.create_cicd_resources ? 1 : 0
+
   source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
   version = "~> 6.0"
 
   name        = "${var.prefix}-${var.environment}-codepipeline"
   description = "CodePipeline policy for source and build"
-  policy      = data.aws_iam_policy_document.codepipeline.json
+  policy      = data.aws_iam_policy_document.codepipeline[0].json
 
   tags = local.common_tags
 }
 
 module "codepipeline_role" {
+  count = var.create_cicd_resources ? 1 : 0
+
   source  = "terraform-aws-modules/iam/aws//modules/iam-role"
   version = "~> 6.0"
 
@@ -206,20 +222,22 @@ module "codepipeline_role" {
   }
 
   policies = {
-    CodePipeline = module.codepipeline_policy.arn
+    CodePipeline = module.codepipeline_policy[0].arn
   }
 
   tags = local.common_tags
 }
 
 module "codepipeline" {
+  count = var.create_cicd_resources ? 1 : 0
+
   source = "../tf-modules/codepipeline"
 
   name     = local.codepipeline_name
-  role_arn = module.codepipeline_role.arn
+  role_arn = module.codepipeline_role[0].arn
 
   artifact_store = {
-    location = module.pipeline_bucket.s3_bucket_id
+    location = module.pipeline_bucket[0].s3_bucket_id
     type     = "S3"
   }
 
@@ -255,7 +273,7 @@ module "codepipeline" {
           input_artifacts  = ["SourceOutput"]
           output_artifacts = ["BuildOutput"]
           configuration = {
-            ProjectName = module.codebuild_project.project_name
+            ProjectName = module.codebuild_project[0].project_name
           }
         }
       ]

@@ -67,6 +67,12 @@ variable "ecr_repository_name" {
   type        = string
 }
 
+variable "create_ecs_resources" {
+  description = "Whether to create ECS/Fargate resources"
+  type        = bool
+  default     = true
+}
+
 variable "image_tag" {
   description = "ECR image tag to deploy"
   type        = string
@@ -128,6 +134,17 @@ variable "repo_branch" {
 variable "codestar_connection_arn" {
   description = "Existing CodeStar Connection ARN for the repo"
   type        = string
+}
+
+variable "create_cicd_resources" {
+  description = "Whether to create CodeBuild/CodePipeline resources"
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = !var.create_cicd_resources || var.create_ecs_resources
+    error_message = "create_cicd_resources can be true only when create_ecs_resources is also true."
+  }
 }
 
 variable "pipeline_name" {

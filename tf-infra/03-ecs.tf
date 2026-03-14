@@ -1,4 +1,6 @@
 module "ecs_log_group" {
+  count = var.create_ecs_resources ? 1 : 0
+
   source  = "terraform-aws-modules/cloudwatch/aws//modules/log-group"
   version = "~> 5.0"
 
@@ -9,6 +11,8 @@ module "ecs_log_group" {
 }
 
 module "ecs" {
+  count = var.create_ecs_resources ? 1 : 0
+
   source  = "terraform-aws-modules/ecs/aws"
   version = "~> 6.0"
 
@@ -48,7 +52,7 @@ module "ecs" {
           logConfiguration = {
             logDriver = "awslogs"
             options = {
-              awslogs-group         = module.ecs_log_group.cloudwatch_log_group_name
+              awslogs-group         = module.ecs_log_group[0].cloudwatch_log_group_name
               awslogs-region        = var.region
               awslogs-stream-prefix = "app"
             }

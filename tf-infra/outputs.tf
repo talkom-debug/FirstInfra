@@ -10,10 +10,10 @@ output "ecr_repository_url" {
 
 output "codebuild_project_name" {
   description = "CodeBuild project name"
-  value       = module.codebuild_project.project_name
+  value       = try(module.codebuild_project[0].project_name, null)
 }
 
 output "codepipeline_name" {
   description = "CodePipeline name"
-  value       = module.codepipeline.pipeline_name
+  value       = try(module.codepipeline[0].pipeline_name, null)
 }
