@@ -63,8 +63,26 @@ variable "alb_ingress_cidrs" {
 }
 
 variable "ecr_repository_name" {
-  description = "Existing ECR repository name"
+  description = "ECR repository name"
   type        = string
+  default     = "dev-repo"
+
+  validation {
+    condition     = !(var.create_ecs_resources || var.create_cicd_resources) || var.ecr_repository_name != null
+    error_message = "ecr_repository_name must be set when create_ecs_resources or create_cicd_resources is true."
+  }
+}
+
+variable "create_ecr_repository" {
+  description = "Whether to create the ECR repository"
+  type        = bool
+  default     = true
+}
+
+variable "ecr_repository_force_delete" {
+  description = "Whether to force-delete the ECR repository (deletes even if images exist)"
+  type        = bool
+  default     = true
 }
 
 variable "create_ecs_resources" {
@@ -118,11 +136,23 @@ variable "log_retention_days" {
 variable "repo_owner" {
   description = "Source repository owner (e.g. GitHub org/user)"
   type        = string
+  default     = null
+
+  validation {
+    condition     = !var.create_cicd_resources || var.repo_owner != null
+    error_message = "repo_owner must be set when create_cicd_resources is true."
+  }
 }
 
 variable "repo_name" {
   description = "Source repository name"
   type        = string
+  default     = null
+
+  validation {
+    condition     = !var.create_cicd_resources || var.repo_name != null
+    error_message = "repo_name must be set when create_cicd_resources is true."
+  }
 }
 
 variable "repo_branch" {
@@ -134,6 +164,12 @@ variable "repo_branch" {
 variable "codestar_connection_arn" {
   description = "Existing CodeStar Connection ARN for the repo"
   type        = string
+  default     = null
+
+  validation {
+    condition     = !var.create_cicd_resources || var.codestar_connection_arn != null
+    error_message = "codestar_connection_arn must be set when create_cicd_resources is true."
+  }
 }
 
 variable "create_cicd_resources" {

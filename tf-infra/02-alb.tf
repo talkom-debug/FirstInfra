@@ -11,6 +11,9 @@ module "alb" {
   create_security_group = false
   security_groups       = [module.sg_alb.security_group_id]
 
+  # Allow Terraform to destroy the ALB.
+  enable_deletion_protection = false
+
   listeners = {
     http = {
       port     = var.container_port

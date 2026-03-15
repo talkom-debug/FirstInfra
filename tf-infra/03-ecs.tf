@@ -38,7 +38,7 @@ module "ecs" {
 
       container_definitions = {
         app = {
-          image = "${data.aws_ecr_repository.app.repository_url}:${var.image_tag}"
+          image = "${local.ecr_repository_url}:${var.image_tag}"
 
           # We manage the log group in `module.ecs_log_group`.
           create_cloudwatch_log_group = false

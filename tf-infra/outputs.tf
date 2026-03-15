@@ -5,7 +5,7 @@ output "alb_dns_name" {
 
 output "ecr_repository_url" {
   description = "ECR repository URL"
-  value       = data.aws_ecr_repository.app.repository_url
+  value       = local.ecr_repository_url
 }
 
 output "codebuild_project_name" {

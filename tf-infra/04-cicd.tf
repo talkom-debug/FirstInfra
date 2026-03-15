@@ -131,7 +131,7 @@ module "codebuild_project" {
     environment_variables = [
       {
         name  = "ECR_REPO"
-        value = data.aws_ecr_repository.app.repository_url
+        value = local.ecr_repository_url
       },
       {
         name  = "AWS_REGION"
